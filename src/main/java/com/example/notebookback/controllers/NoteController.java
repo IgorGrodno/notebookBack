@@ -37,6 +37,7 @@ public class NoteController {
         note.setId(null);
         Note savedNote = noteService.saveNote(note);
         return ResponseEntity.ok(savedNote);
+
     }
 }
 
