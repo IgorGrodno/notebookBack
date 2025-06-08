@@ -1,15 +1,13 @@
 package com.example.notebookback.controllers;
 
+import com.example.notebookback.models.DTOs.NotesDTO;
 import com.example.notebookback.models.ntities.Note;
 import com.example.notebookback.services.NoteService;
-import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notes")
@@ -22,24 +20,17 @@ public class NoteController {
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getNotes(
+    public ResponseEntity<NotesDTO> getNotes(
             @RequestParam int page,
             @RequestParam int size,
             @RequestParam(required = false) String title,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate
     ) {
-        Page<Note> notesPage = noteService.searchNotes(title, startDate, endDate, page, size);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("content", notesPage.getContent());
-        response.put("pageIndex", notesPage.getNumber());
-        response.put("pageSize", notesPage.getSize());
-        response.put("totalNotes", notesPage.getTotalElements());
-        response.put("totalPages", notesPage.getTotalPages());
-
-        return ResponseEntity.ok(response);
+        NotesDTO notesDTO = noteService.searchNotes(title, startDate, endDate, page, size);
+        return ResponseEntity.ok(notesDTO);
     }
+
 
     @PostMapping
     public ResponseEntity<Note> createNote(@RequestBody Note note) {

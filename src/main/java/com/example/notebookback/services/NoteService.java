@@ -1,5 +1,6 @@
 package com.example.notebookback.services;
 
+import com.example.notebookback.models.DTOs.NotesDTO;
 import com.example.notebookback.models.ntities.Note;
 import com.example.notebookback.repositories.NoteRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -23,10 +24,25 @@ public class NoteService {
         this.noteRepository = noteRepository;
     }
 
-    public Page<Note> searchNotes(String title, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
+    public NotesDTO searchNotes(String title, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
 
-        Specification<Note> spec = (root, query, cb) -> {
+        Specification<Note> spec = buildSpecification(title, startDate, endDate);
+
+        Page<Note> notesPage = noteRepository.findAll(spec, pageable);
+
+        NotesDTO dto = new NotesDTO();
+        dto.setNotes(notesPage.getContent());
+        dto.setTotalNotes((int) notesPage.getTotalElements());  // приведение long к int, будь осторожен если много данных
+        dto.setPageSize(notesPage.getSize());
+        dto.setPageIndex(notesPage.getNumber());
+        dto.setTotalPages(notesPage.getTotalPages());
+
+        return dto;
+    }
+
+    private Specification<Note> buildSpecification(String title, LocalDateTime startDate, LocalDateTime endDate) {
+        return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             if (title != null && !title.isBlank()) {
@@ -41,8 +57,6 @@ public class NoteService {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-
-        return noteRepository.findAll(spec, pageable);
     }
 
     public Note saveNote(Note note) {
