@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 public class NotesDTO {
     private List<Note> notes;
-    private int totalNotes;
+    private long totalNotes;
     private int pageSize;
     private int pageIndex;
     private int totalPages;

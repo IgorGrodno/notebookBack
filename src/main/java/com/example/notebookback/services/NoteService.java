@@ -33,7 +33,7 @@ public class NoteService {
 
         NotesDTO dto = new NotesDTO();
         dto.setNotes(notesPage.getContent());
-        dto.setTotalNotes((int) notesPage.getTotalElements());  // приведение long к int, будь осторожен если много данных
+        dto.setTotalNotes(notesPage.getTotalElements());
         dto.setPageSize(notesPage.getSize());
         dto.setPageIndex(notesPage.getNumber());
         dto.setTotalPages(notesPage.getTotalPages());
