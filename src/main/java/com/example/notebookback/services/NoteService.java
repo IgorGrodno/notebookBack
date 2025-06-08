@@ -44,5 +44,9 @@ public class NoteService {
 
         return noteRepository.findAll(spec, pageable);
     }
+
+    public Note saveNote(Note note) {
+        return noteRepository.save(note);
+    }
 }
 
