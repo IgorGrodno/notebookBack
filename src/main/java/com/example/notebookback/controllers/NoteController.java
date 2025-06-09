@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+
 @CrossOrigin(origins = "http://localhost:4200")
 @RestController
 @RequestMapping("/api/notes")
@@ -37,7 +38,19 @@ public class NoteController {
         note.setId(null);
         Note savedNote = noteService.saveNote(note);
         return ResponseEntity.ok(savedNote);
+    }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Note> updateNote(@PathVariable Long id, @RequestBody Note note) {
+        note.setId(id);
+        Note updatedNote = noteService.updateNote(note);
+        return ResponseEntity.ok(updatedNote);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteNote(@PathVariable Long id) {
+        noteService.deleteNote(id);
+        return ResponseEntity.noContent().build();
     }
 }
 

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @Service
 public class NoteService {
@@ -61,6 +62,20 @@ public class NoteService {
 
     public Note saveNote(Note note) {
         return noteRepository.save(note);
+    }
+
+    public Note updateNote(Note note) {
+        if (!noteRepository.existsById(note.getId())) {
+            throw new NoSuchElementException("Note not found with id: " + note.getId());
+        }
+        return noteRepository.save(note);
+    }
+
+    public void deleteNote(Long id) {
+        if (!noteRepository.existsById(id)) {
+            throw new NoSuchElementException("Note not found with id: " + id);
+        }
+        noteRepository.deleteById(id);
     }
 }
 
