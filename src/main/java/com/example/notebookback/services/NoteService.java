@@ -4,10 +4,9 @@ import com.example.notebookback.models.DTOs.NotesDTO;
 import com.example.notebookback.models.ntities.Note;
 import com.example.notebookback.repositories.NoteRepository;
 import jakarta.persistence.criteria.Predicate;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
@@ -19,15 +18,21 @@ import java.util.NoSuchElementException;
 @Service
 public class NoteService {
 
+    private static final Logger logger = LoggerFactory.getLogger(NoteService.class);
+
     private final NoteRepository noteRepository;
 
     public NoteService(NoteRepository noteRepository) {
         this.noteRepository = noteRepository;
     }
 
-    public NotesDTO searchNotes(Long userId, String title, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
+    public NotesDTO searchNotes(Long userId, String title, LocalDateTime startDate, LocalDateTime endDate, int page,
+                                int size) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId must not be null");
+        }
 
+        Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
         Specification<Note> spec = buildSpecification(userId, title, startDate, endDate);
 
         Page<Note> notesPage = noteRepository.findAll(spec, pageable);
@@ -42,11 +47,14 @@ public class NoteService {
         return dto;
     }
 
-    private Specification<Note> buildSpecification(Long userId, String title, LocalDateTime startDate,
-                                                   LocalDateTime endDate) {
+    private Specification<Note> buildSpecification(Long userId, String title, LocalDateTime startDate, LocalDateTime endDate) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("userId"), userId));
+
+            // join с таблицей пользователей
+            var userJoin = root.join("user");
+            predicates.add(cb.equal(userJoin.get("id"), userId));
+
             if (title != null && !title.isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("title")), "%" + title.toLowerCase() + "%"));
             }
@@ -61,22 +69,27 @@ public class NoteService {
         };
     }
 
+
     public Note saveNote(Note note) {
-        return noteRepository.save(note);
+        Note savedNote = noteRepository.save(note);
+        logger.info("Saved note with id: {}", savedNote.getId());
+        return savedNote;
     }
 
     public Note updateNote(Note note) {
-        if (!noteRepository.existsById(note.getId())) {
-            throw new NoSuchElementException("Note not found with id: " + note.getId());
-        }
-        return noteRepository.save(note);
+        return noteRepository.findById(note.getId())
+                .map(existing -> {
+                    Note updatedNote = noteRepository.save(note);
+                    logger.info("Updated note with id: {}", updatedNote.getId());
+                    return updatedNote;
+                })
+                .orElseThrow(() -> new NoSuchElementException("Note not found with id: " + note.getId()));
     }
 
     public void deleteNote(Long id) {
-        if (!noteRepository.existsById(id)) {
-            throw new NoSuchElementException("Note not found with id: " + id);
-        }
-        noteRepository.deleteById(id);
+        Note note = noteRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Note not found with id: " + id));
+        noteRepository.delete(note);
+        logger.info("Deleted note with id: {}", id);
     }
 }
-
