@@ -32,6 +32,7 @@ public class AdminController {
     RoleRepository roleRepository;
     @Autowired
     PasswordEncoder encoder;
+
     @GetMapping("/getallusers")
     @PreAuthorize("hasRole('ADMIN')")
     public List<User> getAllUsers() {

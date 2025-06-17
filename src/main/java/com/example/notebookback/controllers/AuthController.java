@@ -9,7 +9,6 @@ import com.example.notebookback.security.respose.MessageResponse;
 import com.example.notebookback.security.respose.UserInfoResponse;
 import com.example.notebookback.services.UserDetailsImpl;
 import jakarta.validation.Valid;
-import lombok.extern.flogger.Flogger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -22,12 +21,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 
 
-@CrossOrigin(origins = "http://localhost:4200/", maxAge = 600, allowCredentials = "true")
+@CrossOrigin(origins = "http://localhost:4200", maxAge = 600, allowCredentials = "true")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -68,8 +66,6 @@ public class AuthController {
                         userDetails.getEmail(),
                         roles));
     }
-
-
 
 
     @PostMapping("/signout")
