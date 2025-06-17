@@ -37,6 +37,7 @@ public class NotebookBackApplication {
 				user.setRoles(roles);
 				userRepository.save(user);
 			}
+
 		};
 	}
 }

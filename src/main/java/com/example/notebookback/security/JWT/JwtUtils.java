@@ -3,24 +3,18 @@ package com.example.notebookback.security.JWT;
 import java.security.Key;
 import java.util.Date;
 
-
 import com.example.notebookback.services.UserDetailsImpl;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.WebUtils;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.UnsupportedJwtException;
 
 @Component
 public class JwtUtils {
@@ -29,35 +23,39 @@ public class JwtUtils {
     @Value("${jwtSecret}")
     private String jwtSecret;
 
-    @Value("${jwtExpirationMs}")
-    private int jwtExpirationMs;
-
     @Value("${jwtCookieName}")
-    private String jwtCookie;
+    private String jwtCookieName;
+
+    @Value("${jwtExpirationMs}")
+    private long jwtExpirationMs;
+
+    @Value("${jwtCookieMaxAge}")
+    private long jwtCookieMaxAge;
+
+    @Value("${jwtClockSkewSec:60}") // по умолчанию 60 секунд
+    private long jwtClockSkewSec;
 
     public String getJwtFromCookies(HttpServletRequest request) {
-        Cookie cookie = WebUtils.getCookie(request, jwtCookie);
+        Cookie cookie = WebUtils.getCookie(request, jwtCookieName);
         if (cookie != null) {
             return cookie.getValue();
-        } else {
-            return null;
         }
+        return null;
     }
 
     public ResponseCookie generateJwtCookie(UserDetailsImpl userDetails) {
         String jwt = generateTokenFromUsername(userDetails.getUsername());
-        return ResponseCookie.from("jwt", jwt)
+        return ResponseCookie.from(jwtCookieName, jwt)
                 .path("/")
-                .maxAge(24 * 60 * 60)
+                .maxAge(jwtCookieMaxAge)
                 .httpOnly(true)
                 .secure(false)
                 .sameSite("Lax")
                 .build();
     }
 
-
     public ResponseCookie getCleanJwtCookie() {
-        return ResponseCookie.from("jwt", "")
+        return ResponseCookie.from(jwtCookieName, "")
                 .path("/")
                 .maxAge(0)
                 .httpOnly(true)
@@ -66,19 +64,36 @@ public class JwtUtils {
                 .build();
     }
 
+    public String generateTokenFromUsername(String username) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-    public String getUserNameFromJwtToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(key()).build()
-                .parseClaimsJws(token).getBody().getSubject();
+        logger.info("Generated JWT for user '{}': issued at {}, expires at {}", username, now, expiryDate);
+
+        return Jwts.builder()
+                .setSubject(username)
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(key(), SignatureAlgorithm.HS256)
+                .compact();
     }
 
-    private Key key() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+    public String getUserNameFromJwtToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
     }
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parserBuilder().setSigningKey(key()).build().parse(authToken);
+            Jwts.parserBuilder()
+                    .setSigningKey(key())
+                    .setAllowedClockSkewSeconds(jwtClockSkewSec)
+                    .build()
+                    .parseClaimsJws(authToken);
             return true;
         } catch (MalformedJwtException e) {
             logger.error("Invalid JWT token: {}", e.getMessage());
@@ -89,16 +104,10 @@ public class JwtUtils {
         } catch (IllegalArgumentException e) {
             logger.error("JWT claims string is empty: {}", e.getMessage());
         }
-
         return false;
     }
 
-    public String generateTokenFromUsername(String username) {
-        return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(key(), SignatureAlgorithm.HS256)
-                .compact();
+    private Key key() {
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 }

@@ -2,6 +2,7 @@ package com.example.notebookback.controllers;
 
 import com.example.notebookback.models.DTOs.NotesDTO;
 import com.example.notebookback.models.ntities.Note;
+import com.example.notebookback.repositories.UserRepository;
 import com.example.notebookback.services.NoteService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -19,14 +20,15 @@ public class NoteController {
     private static final Logger logger = Logger.getLogger(NoteController.class.getName());
 
     private final NoteService noteService;
+    private final UserRepository userRepository;
 
-    public NoteController(NoteService noteService) {
+    public NoteController(NoteService noteService, UserRepository userRepository) {
         this.noteService = noteService;
+        this.userRepository = userRepository;
     }
 
     @GetMapping
     public ResponseEntity<NotesDTO> getNotes(
-            @CookieValue(value = "jwt", required = false) String jwtToken,
             @RequestHeader("X-User-Id") String userId,
             @RequestParam int page,
             @RequestParam int size,
@@ -34,18 +36,27 @@ public class NoteController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate
     ) {
-        logger.info("jwtToken: " + jwtToken);
-        logger.info("Полученный userId из заголовка: " + userId);
-        NotesDTO notesDTO = noteService.searchNotes(title, startDate, endDate, page, size);
-        return ResponseEntity.ok(notesDTO);
+        try{
+            NotesDTO notesDTO = noteService.searchNotes(Long.parseLong(userId), title, startDate, endDate, page, size);
+            return ResponseEntity.ok(notesDTO);
+        }
+        catch (Exception e){
+            return ResponseEntity.notFound().build();
+        }
     }
 
 
     @PostMapping
-    public ResponseEntity<Note> createNote(@RequestBody Note note) {
-        note.setId(null);
-        Note savedNote = noteService.saveNote(note);
-        return ResponseEntity.ok(savedNote);
+    public ResponseEntity<Note> createNote( @RequestHeader("X-User-Id") String userId, @RequestBody Note note) {
+        try {
+            note.setId(null);
+            note.setUser(userRepository.findById(Long.parseLong(userId)).get());
+            Note savedNote = noteService.saveNote(note);
+            return ResponseEntity.ok(savedNote);
+        }
+        catch (Exception e){
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PutMapping("/{id}")

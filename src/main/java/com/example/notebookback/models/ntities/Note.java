@@ -24,4 +24,7 @@ public class Note {
 
     @Column(columnDefinition = "TEXT")
     private String text;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    private User user;
 }

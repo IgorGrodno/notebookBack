@@ -25,10 +25,10 @@ public class NoteService {
         this.noteRepository = noteRepository;
     }
 
-    public NotesDTO searchNotes(String title, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
+    public NotesDTO searchNotes(Long userId, String title, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
 
-        Specification<Note> spec = buildSpecification(title, startDate, endDate);
+        Specification<Note> spec = buildSpecification(userId, title, startDate, endDate);
 
         Page<Note> notesPage = noteRepository.findAll(spec, pageable);
 
@@ -42,10 +42,11 @@ public class NoteService {
         return dto;
     }
 
-    private Specification<Note> buildSpecification(String title, LocalDateTime startDate, LocalDateTime endDate) {
+    private Specification<Note> buildSpecification(Long userId, String title, LocalDateTime startDate,
+                                                   LocalDateTime endDate) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-
+            predicates.add(cb.equal(root.get("userId"), userId));
             if (title != null && !title.isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("title")), "%" + title.toLowerCase() + "%"));
             }
