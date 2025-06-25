@@ -25,7 +25,8 @@ public class NotebookBackApplication {
 	CommandLineRunner init(NoteRepository noteRepository, UserRepository userRepository, RoleRepository roleRepository,
 						   PasswordEncoder encoder) {
 		return args -> {
-			if(userRepository.findAll().size()==0){
+			if(userRepository.findAll().isEmpty()){
+				roleRepository.deleteAll();
 				roleRepository.save(new Role(ERole.ROLE_ADMIN));
 				roleRepository.save(new Role(ERole.ROLE_USER));
 				User user = new User();

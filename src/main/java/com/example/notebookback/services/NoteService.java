@@ -51,7 +51,6 @@ public class NoteService {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // join с таблицей пользователей
             var userJoin = root.join("user");
             predicates.add(cb.equal(userJoin.get("id"), userId));
 
@@ -77,13 +76,11 @@ public class NoteService {
     }
 
     public Note updateNote(Note note) {
-        return noteRepository.findById(note.getId())
-                .map(existing -> {
-                    Note updatedNote = noteRepository.save(note);
-                    logger.info("Updated note with id: {}", updatedNote.getId());
-                    return updatedNote;
-                })
-                .orElseThrow(() -> new NoSuchElementException("Note not found with id: " + note.getId()));
+       Note updatedNote = noteRepository.getReferenceById(note.getId());
+       updatedNote.setTitle(note.getTitle());
+       updatedNote.setText(note.getText());
+       noteRepository.save(updatedNote);
+       return updatedNote;
     }
 
     public void deleteNote(Long id) {

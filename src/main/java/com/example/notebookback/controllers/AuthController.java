@@ -14,20 +14,23 @@ import com.example.notebookback.services.UserDetailsImpl;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,55 +39,72 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private PasswordEncoder encoder;
-
-    @Autowired
-    private JwtUtils jwtUtils;
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder encoder;
+    private final JwtUtils jwtUtils;
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
+    public AuthController(AuthenticationManager authenticationManager, UserRepository userRepository,
+                          RoleRepository roleRepository, PasswordEncoder encoder, JwtUtils jwtUtils) {
+        this.authenticationManager = authenticationManager;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.encoder = encoder;
+        this.jwtUtils = jwtUtils;
+    }
+
     @PostMapping("/signin")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsername(),
+                            loginRequest.getPassword()
+                    )
+            );
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getUsername(),
-                        loginRequest.getPassword()
-                )
-        );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
 
-        ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
+            logger.info("Generated JWT for user '{}'", userDetails.getUsername());
+            logger.info("Set-Cookie header: {}", jwtCookie.toString());
 
-        logger.info("Generated JWT for user '{}'", userDetails.getUsername());
-        logger.info("Set-Cookie header: {}", jwtCookie.toString());
+            List<String> roles = userDetails.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .collect(Collectors.toList());
 
-        List<String> roles = userDetails.getAuthorities().stream()
-                .map(item -> item.getAuthority())
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .body(new UserInfoResponse(
-                        userDetails.getId(),
-                        userDetails.getUsername(),
-                        userDetails.getEmail(),
-                        roles
-                ));
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                    .body(new UserInfoResponse(
+                            userDetails.getId(),
+                            userDetails.getUsername(),
+                            userDetails.getEmail(),
+                            roles
+                    ));
+        } catch (BadCredentialsException ex) {
+            logger.warn("Authentication failed for user '{}'", loginRequest.getUsername());
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Ошибка: неверное имя пользователя или пароль"));
+        } catch (AuthenticationException ex) {
+            logger.error("Authentication error: {}", ex.getMessage(), ex);
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(new MessageResponse("Ошибка аутентификации: " + ex.getMessage()));
+        } catch (Exception ex) {
+            logger.error("Internal error during authentication", ex);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Внутренняя ошибка сервера"));
+        }
     }
+
 
     @PostMapping("/signout")
     public ResponseEntity<?> logoutUser() {
@@ -97,51 +117,50 @@ public class AuthController {
 
     @PostMapping("/newuserregister")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
-        logger.info("Registering user " + signUpRequest.getRole());
+
         if (userRepository.existsByUsername(signUpRequest.getUsername())) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: Username is already taken!"));
+            logger.info("Username already exists");
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "success", false,
+                            "errorCode", "USERNAME_TAKEN",
+                            "message", "Имя пользователя уже занято."
+                    )
+            );
         }
 
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: Email is already in use!"));
+            logger.info("Email already exists");
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "success", false,
+                            "errorCode", "EMAIL_IN_USE",
+                            "message", "Этот email уже используется."
+                    )
+            );
         }
 
-        // Create new user's account
-        User user = new User(signUpRequest.getUsername(),
+        User user = new User(
+                signUpRequest.getUsername(),
                 signUpRequest.getEmail(),
-                encoder.encode(signUpRequest.getPassword()));
+                encoder.encode(signUpRequest.getPassword())
+        );
 
-        Set<String> strRoles = signUpRequest.getRole();
         Set<Role> roles = new HashSet<>();
 
-        if (strRoles == null) {
-            Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                    .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-            roles.add(userRole);
-        } else {
-            strRoles.forEach(role -> {
-                switch (role) {
-                    case "admin":
-                        Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(adminRole);
-
-                        break;
-                    case "user":
-                        Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                                .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                        roles.add(userRole);
-
-                        break;
-                }
-            });
-        }
-
+        roles.add(roleRepository.findByName(ERole.ROLE_USER).get());
         user.setRoles(roles);
         userRepository.save(user);
 
         logger.info("User created successfully: " + user.getUsername());
-        return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
+        return ResponseEntity.ok(
+                Map.of(
+                        "success", true,
+                        "message", "Пользователь зарегистрирован успешно.",
+                        "username", user.getUsername()
+                )
+        );
     }
+
 
 }
