@@ -11,7 +11,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 public class NotesDTO {
-    private List<Note> notes;
+    private List<NoteDTO> notes;
     private long totalNotes;
     private int pageSize;
     private int pageIndex;

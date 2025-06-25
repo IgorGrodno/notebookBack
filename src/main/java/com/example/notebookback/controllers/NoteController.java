@@ -1,5 +1,6 @@
 package com.example.notebookback.controllers;
 
+import com.example.notebookback.models.DTOs.NoteDTO;
 import com.example.notebookback.models.DTOs.NotesDTO;
 import com.example.notebookback.models.ntities.Note;
 import com.example.notebookback.repositories.UserRepository;
@@ -77,10 +78,10 @@ public class NoteController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Note> updateNote(@PathVariable Long id, @RequestBody Note note) {
+    public ResponseEntity<NoteDTO> updateNote(@PathVariable Long id, @RequestBody Note note) {
         try {
             note.setId(id);
-            Note updatedNote = noteService.updateNote(note);
+            NoteDTO updatedNote = noteService.updateNote(note);
             logger.info("Updated note with id: {}", updatedNote.getId());
             return ResponseEntity.ok(updatedNote);
         } catch (NoSuchElementException e) {

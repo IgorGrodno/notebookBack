@@ -1,8 +1,10 @@
 package com.example.notebookback.services;
 
+import com.example.notebookback.models.DTOs.NoteDTO;
 import com.example.notebookback.models.DTOs.NotesDTO;
 import com.example.notebookback.models.ntities.Note;
 import com.example.notebookback.repositories.NoteRepository;
+import com.example.notebookback.utils.NoteMapper;
 import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +37,7 @@ public class NoteService {
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
         Specification<Note> spec = buildSpecification(userId, title, startDate, endDate);
 
-        Page<Note> notesPage = noteRepository.findAll(spec, pageable);
+        Page<NoteDTO> notesPage =NoteMapper.toDto(noteRepository.findAll(spec, pageable));
 
         NotesDTO dto = new NotesDTO();
         dto.setNotes(notesPage.getContent());
@@ -75,12 +77,13 @@ public class NoteService {
         return savedNote;
     }
 
-    public Note updateNote(Note note) {
+    public NoteDTO updateNote(Note note) {
        Note updatedNote = noteRepository.getReferenceById(note.getId());
        updatedNote.setTitle(note.getTitle());
        updatedNote.setText(note.getText());
        noteRepository.save(updatedNote);
-       return updatedNote;
+       logger.info("Updated note with id: {}", updatedNote.getId());
+       return NoteMapper.toDto(updatedNote);
     }
 
     public void deleteNote(Long id) {
